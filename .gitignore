@@ -9,3 +9,4 @@ cache/
 *.db
 *.log
 *.ipynb
+exports/
