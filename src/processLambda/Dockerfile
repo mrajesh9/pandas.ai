@@ -1,54 +1,60 @@
 # Define global args
 ARG FUNCTION_DIR="/home/app/"
 ARG RUNTIME_VERSION="3.10"
-ARG DISTRO_VERSION="3.12"
+
 # Stage 1 - bundle base image + runtime
-# Grab a fresh copy of the image and install GCC
 FROM python:${RUNTIME_VERSION}-slim AS python-slim
+
 # Update to latest version of pip
 RUN pip install --upgrade pip
-# Install GCC (Alpine uses musl but we compile and link dependencies with GCC)
-# RUN pip install install libstdc++
+
 # Stage 2 - build function and dependencies
 FROM python-slim AS build-image
 
-# Install aws-lambda-cpp build dependencies
-# RUN pip install install build-base \
-#     libtool \
-#     autoconf \
-#     automake \
-#     libexecinfo-dev \
-#     make \
-#     cmake \
-#     libcurl
 # Include global args in this stage of the build
 ARG FUNCTION_DIR
 ARG RUNTIME_VERSION
+
 # Create function directory
 RUN mkdir -p ${FUNCTION_DIR}
+
 # Copy handler function
 COPY app/* ${FUNCTION_DIR}
+
 # Optional – Install the function's dependencies
 RUN python${RUNTIME_VERSION} -m pip install -r ${FUNCTION_DIR}requirements.txt --target ${FUNCTION_DIR}
+
 # Install Lambda Runtime Interface Client for Python
 RUN python${RUNTIME_VERSION} -m pip install awslambdaric --target ${FUNCTION_DIR}
 
 # Stage 3 - final runtime image
-# Grab a fresh copy of the Python image
 FROM python-slim
-# Include global arg in this stage of the build
+
+# Include global args in this stage of the build
 ARG FUNCTION_DIR
+
 # Set working directory to function root directory
 WORKDIR ${FUNCTION_DIR}
+
 # Copy in the built dependencies
 COPY --from=build-image ${FUNCTION_DIR} ${FUNCTION_DIR}
-# ADD https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz ${FUNCTION_DIR}
-# RUN tar -xJC ${FUNCTION_DIR}ffmpeg-release-amd64-static.tar.xz --strip=1 'ffmpeg-*-amd64-static/ffmpeg' /usr/local/bin/ 
-# (Optional) Add Lambda Runtime Interface Emulator and use a script in the ENTRYPOINT for simpler local runs
+
+# Add Lambda Runtime Interface Emulator
 ADD https://github.com/aws/aws-lambda-runtime-interface-emulator/releases/latest/download/aws-lambda-rie /usr/bin/aws-lambda-rie
-# RUN apt-get install ffmpeg
-RUN mkdir downloads
+
+# Make the necessary scripts executable
+RUN chmod 755 /usr/bin/aws-lambda-rie
+
+# Copy the entry script
 COPY entry.sh /
-RUN chmod 755 /usr/bin/aws-lambda-rie /entry.sh
+RUN chmod 755 /entry.sh
+
+# Create the symbolic link from /home/app/exports to /tmp/exports
+RUN ln -s /tmp/exports /home/app/exports
+
+# Create /tmp/exports directory
+RUN mkdir -p /tmp/exports && chmod -R 777 /tmp/exports
+
+# Entry point and default command
 ENTRYPOINT [ "/entry.sh" ]
 CMD [ "app.main_handler" ]

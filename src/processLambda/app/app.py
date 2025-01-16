@@ -1,3 +1,4 @@
+from pathlib import Path
 import pandas as pd
 import boto3
 from io import StringIO, BytesIO
@@ -34,6 +35,17 @@ config = {
     "enable_cache": False
 }
 
+# import os
+
+# # Use /tmp for writable paths
+# EXPORTS_DIR = "/tmp/exports"
+
+# # Ensure the directory exists
+# os.makedirs(EXPORTS_DIR, exist_ok=True)
+
+# # Example path for charts
+# charts_dir = os.path.join(EXPORTS_DIR, "charts")
+# os.makedirs(charts_dir, exist_ok=True)
 
 def main_handler(event, context):
     logger.info(f"Event: {event}")
@@ -63,6 +75,9 @@ def main_handler(event, context):
 
 
 def run_smart_df(dataframe, user_query):
+    export_path = "/tmp/exports/charts"
+    save_charts_path = Path(export_path)
+    save_charts_path.mkdir(parents=True, exist_ok=True)
     smart_dataframe = SmartDataframe(dataframe, config=config)
     response_text = smart_dataframe.chat(query=user_query, output_type="string")
     logger.info(f"Response from SmartDataframe: {response_text}")
